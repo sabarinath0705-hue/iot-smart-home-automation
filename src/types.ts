@@ -13,4 +13,9 @@ export interface Device {
   colorTemp?: number; // Light color temperature (e.g. 2700 - 6500)
   oscillation?: boolean; // Fan oscillation
   mode?: ACMode; // AC mode
+  schedule?: {
+    timeOn?: string;
+    timeOff?: string;
+  };
+  isResponsive?: boolean;
 }

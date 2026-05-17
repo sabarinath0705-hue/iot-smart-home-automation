@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Home, Settings, Activity, CloudRain, Thermometer, Zap, Bell, User } from 'lucide-react';
+import { Home, Settings, Activity, CloudRain, Thermometer, Zap, Bell, User, AlertCircle, X } from 'lucide-react';
 import { initialDevices } from './data';
 import { Device, Room } from './types';
 import { DeviceCard } from './components/DeviceCard';
@@ -10,24 +10,65 @@ const ROOMS: Room[] = ['Living Room', 'Bedroom', 'Kitchen', 'Bathroom'];
 export default function App() {
   const [devices, setDevices] = useState<Device[]>(initialDevices);
   const [activeRoom, setActiveRoom] = useState<Room>('Living Room');
+  const [toasts, setToasts] = useState<{id: string, message: string}[]>([]);
   
   const activeDevices = useMemo(() => {
     return devices.filter(d => d.room === activeRoom);
   }, [devices, activeRoom]);
 
+  const addToast = (message: string) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  };
+
   const toggleDevice = (id: string) => {
+    const device = devices.find(d => d.id === id);
+    if (!device) return;
+
+    if (device.isResponsive === false) {
+      addToast(`${device.name} is currently offline and unresponsive.`);
+      return;
+    }
+
     setDevices(prev => 
       prev.map(d => d.id === id ? { ...d, isOn: !d.isOn } : d)
     );
+
+    // Simulate network error (15% chance of failure)
+    setTimeout(() => {
+      if (Math.random() < 0.15) {
+        setDevices(prev => prev.map(d => d.id === id ? { ...d, isOn: device.isOn } : d));
+        addToast(`Command failed: Could not turn ${device.name} ${!device.isOn ? 'on' : 'off'}.`);
+      }
+    }, 500);
   };
 
   const changeDeviceValue = (id: string, value: number) => {
+    const device = devices.find(d => d.id === id);
+    if (!device) return;
+    
+    if (device.isResponsive === false) {
+      addToast(`${device.name} is unresponsive. Cannot apply settings.`);
+      return;
+    }
+
     setDevices(prev => 
       prev.map(d => d.id === id ? { ...d, value } : d)
     );
   };
 
   const changeDeviceSetting = (id: string, setting: Partial<Device>) => {
+    const device = devices.find(d => d.id === id);
+    if (!device) return;
+    
+    if (device.isResponsive === false) {
+      addToast(`${device.name} is unresponsive. Cannot apply settings.`);
+      return;
+    }
+
     setDevices(prev => 
       prev.map(d => d.id === id ? { ...d, ...setting } : d)
     );
@@ -36,7 +77,31 @@ export default function App() {
   const activeCount = useMemo(() => devices.filter(d => d.isOn).length, [devices]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-dark-bg text-gray-100 selection:bg-primary/30 pb-20 md:pb-0 md:flex-row">
+    <div className="flex flex-col min-h-screen bg-dark-bg text-gray-100 selection:bg-primary/30 pb-20 md:pb-0 md:flex-row overflow-x-hidden">
+      
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-[calc(100vw-2rem)]">
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: -20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+              className="bg-red-500/10 border border-red-500/50 text-red-200 px-4 py-3 rounded-xl flex items-center gap-3 backdrop-blur-md shadow-lg w-full md:min-w-[300px]"
+            >
+              <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <p className="text-sm font-medium flex-1">{toast.message}</p>
+              <button 
+                onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                className="text-red-400 hover:text-red-200 transition-colors flex-shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
       {/* Sidebar / Bottom Nav Spacer for desktop padding */}
       <aside className="hidden md:flex flex-col w-24 border-r border-dark-border bg-dark-card items-center py-8 gap-8 fixed h-full z-50">
         <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mb-8">

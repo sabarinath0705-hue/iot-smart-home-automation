@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Lightbulb, Fan, ThermometerSnowflake, Tv, Plug, Power, Settings2, Wind, RefreshCw, Sun } from 'lucide-react';
+import { Lightbulb, Fan, ThermometerSnowflake, Tv, Plug, Power, Settings2, Wind, RefreshCw, Sun, Clock } from 'lucide-react';
 import { Device, ACMode } from '../types';
 
 interface DeviceCardProps {
@@ -26,6 +26,7 @@ const getDeviceIcon = (type: string, isOn: boolean) => {
 };
 
 const getDeviceStatus = (device: Device) => {
+  if (device.isResponsive === false) return 'Offline';
   if (!device.isOn) return 'Off';
   if (device.type === 'light') return `${device.value}%`;
   if (device.type === 'ac') return `${device.value}°C`;
@@ -36,6 +37,8 @@ const getDeviceStatus = (device: Device) => {
 export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onValueChange, onChangeSetting }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const hasGranularSettings = device.type === 'light' || device.type === 'fan' || device.type === 'ac';
+  
+  const isUnresponsive = device.isResponsive === false;
 
   return (
     <motion.div
@@ -45,7 +48,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onValu
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.2 }}
       className={`relative overflow-hidden rounded-2xl p-4 transition-all duration-300 ${
-        device.isOn 
+        isUnresponsive ? 'opacity-60 grayscale-[0.8]' : ''
+      } ${
+        device.isOn && !isUnresponsive
           ? 'bg-dark-card border border-primary/30 shadow-[0_0_15px_rgba(59,130,246,0.15)]' 
           : 'bg-dark-card/50 border border-dark-border'
       }`}
@@ -56,17 +61,15 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onValu
         </div>
         
         <div className="flex items-center gap-2">
-          {hasGranularSettings && device.isOn && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className={`p-1.5 rounded-full transition-colors ${isExpanded ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-            >
-              <Settings2 className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className={`p-1.5 rounded-full transition-colors ${isExpanded ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
           <button
             onClick={() => {
-              if (device.isOn) setIsExpanded(false);
+              // we don't auto-close anymore to allow schedule editing while off
               onToggle(device.id);
             }}
             className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${
@@ -87,9 +90,9 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onValu
         <p className="text-xs text-gray-400 mt-1">{getDeviceStatus(device)}</p>
       </div>
 
-      {device.isOn && (device.value !== undefined || isExpanded) && (
+      {(device.isOn && device.value !== undefined || isExpanded) && (
         <div className="mt-4 pt-3 border-t border-dark-border/50">
-          {device.value !== undefined && (
+          {device.isOn && device.value !== undefined && (
             <div className="mb-2">
               <div className="flex justify-between text-xs text-gray-400 mb-2">
                 <span>{device.type === 'ac' ? 'Temperature' : device.type === 'fan' ? 'Speed' : 'Brightness'}</span>
@@ -115,6 +118,32 @@ export const DeviceCard: React.FC<DeviceCardProps> = ({ device, onToggle, onValu
                 className="overflow-hidden"
               >
                 <div className="pt-3 mt-2 border-t border-dark-border/50 space-y-4">
+                  
+                  {/* Schedule Controls */}
+                  <div>
+                    <span className="text-xs text-gray-400 mb-2 flex items-center gap-1"><Clock className="w-3 h-3" /> Schedule</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-500">Turn On At</label>
+                        <input 
+                          type="time" 
+                          value={device.schedule?.timeOn || ''} 
+                          onChange={(e) => onChangeSetting(device.id, { schedule: { ...device.schedule, timeOn: e.target.value } })}
+                          className="bg-gray-800 text-xs text-gray-200 p-1.5 rounded-md border border-gray-700 focus:outline-none focus:border-primary w-full [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-gray-500">Turn Off At</label>
+                        <input 
+                          type="time" 
+                          value={device.schedule?.timeOff || ''} 
+                          onChange={(e) => onChangeSetting(device.id, { schedule: { ...device.schedule, timeOff: e.target.value } })}
+                          className="bg-gray-800 text-xs text-gray-200 p-1.5 rounded-md border border-gray-700 focus:outline-none focus:border-primary w-full [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Light Granular Controls */}
                   {device.type === 'light' && device.colorTemp !== undefined && (
                     <div>
